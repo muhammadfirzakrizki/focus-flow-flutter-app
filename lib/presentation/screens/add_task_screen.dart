@@ -25,7 +25,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       text: widget.task?.description ?? "",
     );
     _timerController = TextEditingController(
-      text: widget.task?.duration.toString() ?? "25",
+      text: widget.task?.duration.toString() ?? "",
     );
   }
 
@@ -112,7 +112,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   ),
                 ),
                 icon: Icon(isEdit ? Icons.edit : Icons.save),
-                label: Text(isEdit ? 'SIMPAN PERUBAHAN' : 'SIMPAN & MULAI'),
+                label: Text(isEdit ? 'SIMPAN PERUBAHAN' : 'SIMPAN FOKUS'),
               ),
             ),
           ],

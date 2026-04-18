@@ -5,14 +5,14 @@ class TaskModel {
   final String title;
   final String description;
   final bool isDone;
-  final int duration; // Tambahan: Durasi fokus dalam menit (misal: 25)
+  final int duration; // Tambahan: Durasi fokus dalam detik (misal: 30)
 
   TaskModel({
     this.id,
     required this.title,
     required this.description,
     this.isDone = false,
-    this.duration = 60, // Default pomodoro 25 menit
+    this.duration = 30, // Default durasi 30 detik
   });
 
   // 1. Konversi dari Object ke Map (untuk Database/JSON)
