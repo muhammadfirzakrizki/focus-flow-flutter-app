@@ -8,4 +8,7 @@ const mySchema = Schema([
     Column.integer('is_done'),
     Column.text('created_at'),
   ]),
+  Table('app_settings', [
+    Column.text('value'),
+  ]),
 ]);

@@ -4,6 +4,7 @@ import '../../data/models/task_model.dart';
 import '../../../../providers/task/task_provider.dart'; // Sesuaikan path provider kamu
 import '../widgets/empty_task_view.dart';
 import '../widgets/task_card.dart';
+import '../../../settings/presentation/pages/settings_screen.dart';
 import 'add_task_screen.dart';
 import 'timer_screen.dart';
 
@@ -45,6 +46,17 @@ class HomeScreen extends ConsumerWidget {
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+        ],
       ),
       // Menggunakan pola .when untuk menangani state data
       body: tasksAsync.when(
