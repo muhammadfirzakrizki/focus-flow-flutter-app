@@ -1,18 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Tambahkan Riverpod
 import '../../data/models/task_model.dart';
+import '../../../../providers/task/task_provider.dart'; // Import provider kamu
 import '../widgets/timer_display.dart';
 import 'package:focus_flow/core/ui_kit/app_button.dart';
+import 'package:focus_flow/core/ui_kit/app_sheet.dart';
 
-class TimerScreen extends StatefulWidget {
+class TimerScreen extends ConsumerStatefulWidget {
   final TaskModel task;
   const TimerScreen({super.key, required this.task});
 
   @override
-  State<TimerScreen> createState() => _TimerScreenState();
+  ConsumerState<TimerScreen> createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends State<TimerScreen> {
+class _TimerScreenState extends ConsumerState<TimerScreen> {
   late int _secondsRemaining;
   Timer? _timer;
   bool _isRunning = false;
@@ -23,11 +26,12 @@ class _TimerScreenState extends State<TimerScreen> {
     _secondsRemaining = widget.task.duration;
   }
 
-  // --- LOGIC PERIPHERALS ---
-
-  void _toggleTimer() {
+  Future<void> _toggleTimer() async {
     if (_isRunning) {
       _timer?.cancel();
+      setState(() => _isRunning = false);
+      await _saveProgress();
+      return;
     } else {
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_secondsRemaining > 0) {
@@ -36,62 +40,80 @@ class _TimerScreenState extends State<TimerScreen> {
           _finishTask();
         }
       });
+      setState(() => _isRunning = true);
     }
-    setState(() => _isRunning = !_isRunning);
   }
 
-  void _finishTask() {
+  Future<void> _saveProgress() async {
+    final updatedTask = widget.task.copyWith(
+      duration: _secondsRemaining,
+      isDone: false,
+    );
+
+    await ref.read(taskControllerProvider.notifier).addTask(updatedTask);
+    if (!mounted) return;
+
+    final saveState = ref.read(taskControllerProvider);
+    if (saveState.hasError) {
+      await AppSheet.showConfirmation(
+        context: context,
+        title: "Penyimpanan Gagal",
+        description: "Progress belum tersimpan ke database.",
+        icon: Icons.error_outline_rounded,
+        confirmLabel: "OK",
+        confirmColor: Colors.redAccent,
+        onConfirm: () {},
+      );
+    }
+  }
+
+  Future<void> _finishTask() async {
     _timer?.cancel();
     setState(() => _isRunning = false);
 
-    // Menggunakan copyWith dari Model agar data konsisten
-    final completedTask = widget.task.copyWith(isDone: true);
+    final completedTask = widget.task.copyWith(isDone: true, duration: 0);
+
+    // Tunggu proses simpan agar tidak balapan dengan init DB.
+    await ref.read(taskControllerProvider.notifier).addTask(completedTask);
+    if (!mounted) return;
+
+    final finishState = ref.read(taskControllerProvider);
+    if (finishState.hasError) {
+      await AppSheet.showConfirmation(
+        context: context,
+        title: "Koneksi Database Gagal",
+        description: "Gagal terhubung ke database. Coba lagi sebentar.",
+        icon: Icons.wifi_off_rounded,
+        confirmLabel: "OK",
+        confirmColor: Colors.redAccent,
+        onConfirm: () {},
+      );
+      return;
+    }
+
     _showFinishedDialog(completedTask);
   }
 
   String _formatTime(int totalSeconds) {
-    final int minutes = totalSeconds ~/ 60;
+    final int hours = totalSeconds ~/ 3600;
+    final int minutes = (totalSeconds % 3600) ~/ 60;
     final int seconds = totalSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  // --- UI COMPONENTS ---
-
   void _showFinishedDialog(TaskModel completedTask) {
-    showDialog(
+    AppSheet.showConfirmation(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.stars_rounded, color: Colors.amber, size: 80),
-            const SizedBox(height: 16),
-            const Text(
-              "Luar Biasa!",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Sesi fokus '${completedTask.title}' selesai.",
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            AppButton(
-              label: "KEMBALI KE BERANDA",
-              onPressed: () {
-                Navigator.pop(context); // Tutup dialog
-                Navigator.pop(
-                  context,
-                  completedTask,
-                ); // Balik ke Home bawa data
-              },
-            ),
-          ],
-        ),
-      ),
+      title: "Luar Biasa!",
+      description:
+          "Sesi fokus '${completedTask.title}' telah selesai. Kamu selangkah lebih dekat dengan tujuanmu.",
+      icon: Icons.stars_rounded,
+      confirmLabel: "KEMBALI KE BERANDA",
+      confirmColor: Colors.amber.shade700,
+      onConfirm: () {
+        // Cukup pop sekali untuk kembali ke Home
+        Navigator.pop(context);
+      },
     );
   }
 
@@ -100,35 +122,27 @@ class _TimerScreenState extends State<TimerScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Sesi Fokus")),
+      appBar: AppBar(
+        title: const Text("Sesi Fokus"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Column(
           children: [
             const SizedBox(height: 40),
-
-            // Header: Judul & Deskripsi
             _buildHeader(colorScheme),
-
             const Spacer(),
-
-            // Timer: Lingkaran & Angka (Modular Widget)
             TimerDisplay(
               progress: _secondsRemaining / widget.task.duration,
               formattedTime: _formatTime(_secondsRemaining),
               isRunning: _isRunning,
             ),
-
             const Spacer(),
-
-            // Kontrol: Play, Pause, Reset
             _buildActionControls(colorScheme),
-
             const SizedBox(height: 12),
-
-            // Tombol Skip / Selesaikan Manual
             _buildSkipButton(colorScheme),
-
             const SizedBox(height: 40),
           ],
         ),
@@ -165,7 +179,6 @@ class _TimerScreenState extends State<TimerScreen> {
             onPressed: _toggleTimer,
           ),
         ),
-        // Tombol reset hanya muncul jika timer sedang berhenti dan sudah sempat berjalan
         if (!_isRunning && _secondsRemaining < widget.task.duration) ...[
           const SizedBox(width: 12),
           IconButton.filledTonal(

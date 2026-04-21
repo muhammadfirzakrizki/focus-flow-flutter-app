@@ -1,27 +1,30 @@
 import 'dart:convert';
 
 class TaskModel {
-  final int id; // Kita buat non-nullable agar key Dismissible aman
+  final String id;
   final String title;
   final String description;
   final bool isDone;
   final int duration;
+  final DateTime createdAt;
 
   TaskModel({
     required this.id,
     required this.title,
     required this.description,
+    required this.createdAt,
     this.isDone = false,
     this.duration = 30,
   });
 
   // Fungsi CopyWith: Sangat berguna untuk update status isDone di UI Kit
   TaskModel copyWith({
-    int? id,
+    String? id,
     String? title,
     String? description,
     bool? isDone,
     int? duration,
+    DateTime? createdAt,
   }) {
     return TaskModel(
       id: id ?? this.id,
@@ -29,6 +32,7 @@ class TaskModel {
       description: description ?? this.description,
       isDone: isDone ?? this.isDone,
       duration: duration ?? this.duration,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -38,19 +42,29 @@ class TaskModel {
       'id': id,
       'title': title,
       'description': description,
-      'isDone': isDone, // Simpan sebagai boolean langsung
+      'is_done': isDone ? 1 : 0,
       'duration': duration,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 
   // From Map: Ambil data dengan proteksi default value
   factory TaskModel.fromMap(Map<String, dynamic> map) {
+    final rawIsDone = map['is_done'] ?? map['isDone'] ?? false;
+    final bool parsedIsDone = rawIsDone == true || rawIsDone == 1;
+    final rawDuration = map['duration'];
+    final int parsedDuration = rawDuration is int
+        ? rawDuration
+        : int.tryParse('$rawDuration') ?? 30;
+    final rawCreatedAt = map['created_at'] ?? map['createdAt'];
+
     return TaskModel(
-      id: map['id'] ?? 0,
+      id: '${map['id'] ?? ''}',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
-      isDone: map['isDone'] ?? false,
-      duration: map['duration'] ?? 30,
+      isDone: parsedIsDone,
+      duration: parsedDuration,
+      createdAt: DateTime.tryParse('$rawCreatedAt') ?? DateTime.now(),
     );
   }
 
