@@ -4,8 +4,9 @@ import '../models/task_model.dart';
 class TaskLocalDataSource {
   /// Mengambil data secara reaktif (Stream).
   /// Setiap kali ada perubahan di database, UI akan otomatis update.
-  Stream<List<TaskModel>> watchTasks() {
-    return db
+  Stream<List<TaskModel>> watchTasks() async* {
+    await PowerSyncConfig.ensureReady();
+    yield* db
         .watch('SELECT * FROM tasks ORDER BY created_at DESC')
         .map((results) {
           return results.map((row) => TaskModel.fromMap(row)).toList();
@@ -14,6 +15,7 @@ class TaskLocalDataSource {
 
   /// Mengambil semua task sekali panggil (Future).
   Future<List<TaskModel>> getAllTasks() async {
+    await PowerSyncConfig.ensureReady();
     final results = await db.getAll(
       'SELECT * FROM tasks ORDER BY created_at DESC',
     );
@@ -22,6 +24,7 @@ class TaskLocalDataSource {
 
   /// Menambah atau mengupdate task (Upsert).
   Future<void> saveTask(TaskModel task) async {
+    await PowerSyncConfig.ensureReady();
     await db.execute(
       '''
       INSERT OR REPLACE INTO tasks (id, title, description, is_done, duration, created_at)
@@ -40,11 +43,13 @@ class TaskLocalDataSource {
 
   /// Menghapus task berdasarkan ID.
   Future<void> deleteTask(String id) async {
+    await PowerSyncConfig.ensureReady();
     await db.execute('DELETE FROM tasks WHERE id = ?', [id]);
   }
 
   /// Mengubah status isDone secara cepat.
   Future<void> toggleTaskStatus(String id, bool isDone) async {
+    await PowerSyncConfig.ensureReady();
     await db.execute(
       'UPDATE tasks SET is_done = ? WHERE id = ?',
       [isDone ? 1 : 0, id],

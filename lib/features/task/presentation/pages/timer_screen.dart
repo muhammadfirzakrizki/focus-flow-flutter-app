@@ -26,9 +26,12 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     _secondsRemaining = widget.task.duration;
   }
 
-  void _toggleTimer() {
+  Future<void> _toggleTimer() async {
     if (_isRunning) {
       _timer?.cancel();
+      setState(() => _isRunning = false);
+      await _saveProgress();
+      return;
     } else {
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_secondsRemaining > 0) {
@@ -37,26 +40,65 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
           _finishTask();
         }
       });
+      setState(() => _isRunning = true);
     }
-    setState(() => _isRunning = !_isRunning);
   }
 
-  void _finishTask() {
+  Future<void> _saveProgress() async {
+    final updatedTask = widget.task.copyWith(
+      duration: _secondsRemaining,
+      isDone: false,
+    );
+
+    await ref.read(taskControllerProvider.notifier).addTask(updatedTask);
+    if (!mounted) return;
+
+    final saveState = ref.read(taskControllerProvider);
+    if (saveState.hasError) {
+      await AppSheet.showConfirmation(
+        context: context,
+        title: "Penyimpanan Gagal",
+        description: "Progress belum tersimpan ke database.",
+        icon: Icons.error_outline_rounded,
+        confirmLabel: "OK",
+        confirmColor: Colors.redAccent,
+        onConfirm: () {},
+      );
+    }
+  }
+
+  Future<void> _finishTask() async {
     _timer?.cancel();
     setState(() => _isRunning = false);
 
-    final completedTask = widget.task.copyWith(isDone: true);
+    final completedTask = widget.task.copyWith(isDone: true, duration: 0);
 
-    // UPDATE DATABASE LANGSUNG
-    ref.read(taskControllerProvider.notifier).addTask(completedTask);
+    // Tunggu proses simpan agar tidak balapan dengan init DB.
+    await ref.read(taskControllerProvider.notifier).addTask(completedTask);
+    if (!mounted) return;
+
+    final finishState = ref.read(taskControllerProvider);
+    if (finishState.hasError) {
+      await AppSheet.showConfirmation(
+        context: context,
+        title: "Koneksi Database Gagal",
+        description: "Gagal terhubung ke database. Coba lagi sebentar.",
+        icon: Icons.wifi_off_rounded,
+        confirmLabel: "OK",
+        confirmColor: Colors.redAccent,
+        onConfirm: () {},
+      );
+      return;
+    }
 
     _showFinishedDialog(completedTask);
   }
 
   String _formatTime(int totalSeconds) {
-    final int minutes = totalSeconds ~/ 60;
+    final int hours = totalSeconds ~/ 3600;
+    final int minutes = (totalSeconds % 3600) ~/ 60;
     final int seconds = totalSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   void _showFinishedDialog(TaskModel completedTask) {

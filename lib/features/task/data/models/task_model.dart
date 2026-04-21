@@ -42,21 +42,29 @@ class TaskModel {
       'id': id,
       'title': title,
       'description': description,
-      'isDone': isDone, // Simpan sebagai boolean langsung
+      'is_done': isDone ? 1 : 0,
       'duration': duration,
-      'createdAt': createdAt.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
     };
   }
 
   // From Map: Ambil data dengan proteksi default value
   factory TaskModel.fromMap(Map<String, dynamic> map) {
+    final rawIsDone = map['is_done'] ?? map['isDone'] ?? false;
+    final bool parsedIsDone = rawIsDone == true || rawIsDone == 1;
+    final rawDuration = map['duration'];
+    final int parsedDuration = rawDuration is int
+        ? rawDuration
+        : int.tryParse('$rawDuration') ?? 30;
+    final rawCreatedAt = map['created_at'] ?? map['createdAt'];
+
     return TaskModel(
-      id: map['id'] ?? 0,
+      id: '${map['id'] ?? ''}',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
-      isDone: map['isDone'] ?? false,
-      duration: map['duration'] ?? 30,
-      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
+      isDone: parsedIsDone,
+      duration: parsedDuration,
+      createdAt: DateTime.tryParse('$rawCreatedAt') ?? DateTime.now(),
     );
   }
 
