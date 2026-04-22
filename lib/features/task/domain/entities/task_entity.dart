@@ -5,6 +5,7 @@ class TaskEntity extends Equatable {
   final String title;
   final String description;
   final int duration; // Dalam detik
+  final int remainingDurationMs;
   final bool isDone;
   final DateTime createdAt;
 
@@ -13,6 +14,7 @@ class TaskEntity extends Equatable {
     required this.title,
     required this.description,
     required this.duration,
+    required this.remainingDurationMs,
     this.isDone = false,
     required this.createdAt,
   });
@@ -23,6 +25,7 @@ class TaskEntity extends Equatable {
     String? title,
     String? description,
     int? duration,
+    int? remainingDurationMs,
     bool? isDone,
     DateTime? createdAt,
   }) {
@@ -31,6 +34,7 @@ class TaskEntity extends Equatable {
       title: title ?? this.title,
       description: description ?? this.description,
       duration: duration ?? this.duration,
+      remainingDurationMs: remainingDurationMs ?? this.remainingDurationMs,
       isDone: isDone ?? this.isDone,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -42,6 +46,7 @@ class TaskEntity extends Equatable {
     title,
     description,
     duration,
+    remainingDurationMs,
     isDone,
     createdAt,
   ];

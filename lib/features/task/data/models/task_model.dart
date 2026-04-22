@@ -1,37 +1,36 @@
 import 'dart:convert';
 
-class TaskModel {
-  final String id;
-  final String title;
-  final String description;
-  final bool isDone;
-  final int duration;
-  final DateTime createdAt;
+import '../../domain/entities/task_entity.dart';
 
-  TaskModel({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.createdAt,
-    this.isDone = false,
-    this.duration = 30,
+class TaskModel extends TaskEntity {
+  const TaskModel({
+    required super.id,
+    required super.title,
+    required super.description,
+    required super.duration,
+    required super.remainingDurationMs,
+    super.isDone = false,
+    required super.createdAt,
   });
 
   // Fungsi CopyWith: Sangat berguna untuk update status isDone di UI Kit
+  @override
   TaskModel copyWith({
     String? id,
     String? title,
     String? description,
-    bool? isDone,
     int? duration,
+    int? remainingDurationMs,
+    bool? isDone,
     DateTime? createdAt,
   }) {
     return TaskModel(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
-      isDone: isDone ?? this.isDone,
       duration: duration ?? this.duration,
+      remainingDurationMs: remainingDurationMs ?? this.remainingDurationMs,
+      isDone: isDone ?? this.isDone,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -44,6 +43,7 @@ class TaskModel {
       'description': description,
       'is_done': isDone ? 1 : 0,
       'duration': duration,
+      'remaining_duration_ms': remainingDurationMs,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -56,6 +56,11 @@ class TaskModel {
     final int parsedDuration = rawDuration is int
         ? rawDuration
         : int.tryParse('$rawDuration') ?? 30;
+    final rawRemainingDurationMs =
+        map['remaining_duration_ms'] ?? map['remainingDurationMs'];
+    final int parsedRemainingDurationMs = rawRemainingDurationMs is int
+        ? rawRemainingDurationMs
+        : int.tryParse('$rawRemainingDurationMs') ?? (parsedDuration * 1000);
     final rawCreatedAt = map['created_at'] ?? map['createdAt'];
 
     return TaskModel(
@@ -64,6 +69,7 @@ class TaskModel {
       description: map['description'] ?? '',
       isDone: parsedIsDone,
       duration: parsedDuration,
+      remainingDurationMs: parsedRemainingDurationMs,
       createdAt: DateTime.tryParse('$rawCreatedAt') ?? DateTime.now(),
     );
   }

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/task_model.dart';
-import '../../../../providers/task/task_provider.dart';
+import '../../domain/entities/task_entity.dart';
+import '../providers/task_providers.dart';
 import 'package:focus_flow/core/ui_kit/app_input.dart';
 import 'package:focus_flow/core/ui_kit/app_button.dart';
 import 'package:focus_flow/core/utils/time_converter.dart';
 
 class AddTaskScreen extends ConsumerStatefulWidget {
-  final TaskModel? task;
+  final TaskEntity? task;
   const AddTaskScreen({super.key, this.task});
 
   @override
@@ -51,7 +51,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     );
   }
 
-  void _submitData() {
+  Future<void> _submitData() async {
     setState(() => _durationError = null);
 
     final isFormValid = _formKey.currentState!.validate();
@@ -67,26 +67,43 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     }
 
     if (isFormValid && totalDuration > 0) {
+      final existingTask = widget.task;
+      final remainingDurationMs =
+          existingTask != null && existingTask.duration == totalDuration
+          ? existingTask.remainingDurationMs
+          : totalDuration * 1000;
+
       final task =
-          widget.task?.copyWith(
+          existingTask?.copyWith(
             title: _titleController.text,
             description: _descController.text,
             duration: totalDuration,
+            remainingDurationMs: remainingDurationMs,
           ) ??
-          TaskModel(
+          TaskEntity(
             // Perbaikan: Konversi int ke String agar tidak error 'int cant be assigned to String'
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             title: _titleController.text,
             description: _descController.text,
             duration: totalDuration,
+            remainingDurationMs: totalDuration * 1000,
             isDone: false,
             // Perbaikan: Tambahkan parameter createdAt yang diwajibkan oleh model
             createdAt: DateTime.now(),
           );
 
       // Simpan langsung ke database lewat provider
-      ref.read(taskControllerProvider.notifier).addTask(task);
-      Navigator.pop(context);
+      try {
+        await ref.read(taskControllerProvider).saveTask(task);
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menyimpan task.')),
+        );
+      }
     }
   }
 
