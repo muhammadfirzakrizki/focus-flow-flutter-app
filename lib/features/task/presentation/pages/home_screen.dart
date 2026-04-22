@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/task_model.dart';
-import '../../../../providers/task/task_provider.dart'; // Sesuaikan path provider kamu
+import '../../domain/entities/task_entity.dart';
+import '../providers/task_providers.dart';
 import '../widgets/empty_task_view.dart';
 import '../widgets/task_card.dart';
 import '../../../settings/presentation/pages/settings_screen.dart';
@@ -15,16 +15,52 @@ class HomeScreen extends ConsumerWidget {
   Future<void> _navigateToAddTask(
     BuildContext context,
     WidgetRef ref, {
-    TaskModel? task,
+    TaskEntity? task,
   }) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => AddTaskScreen(task: task)),
     );
 
-    if (result != null && result is TaskModel) {
-      // Panggil controller untuk simpan ke PowerSync
-      ref.read(taskControllerProvider.notifier).addTask(result);
+    if (!context.mounted) return;
+
+    if (result != null && result is TaskEntity) {
+      await _saveTask(context, ref, result);
+    }
+  }
+
+  Future<void> _saveTask(
+    BuildContext context,
+    WidgetRef ref,
+    TaskEntity task,
+  ) async {
+    debugPrint(
+      '_saveTask called: ${task.id} - remainingDurationMs: ${task.remainingDurationMs}, isDone: ${task.isDone}',
+    );
+    try {
+      await ref.read(taskControllerProvider).saveTask(task);
+      debugPrint('Save completed for: ${task.id}');
+    } catch (e) {
+      debugPrint('Save failed: $e');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gagal menyimpan task.')));
+    }
+  }
+
+  Future<void> _deleteTask(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+  ) async {
+    try {
+      await ref.read(taskControllerProvider).deleteById(id);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gagal menghapus task.')));
     }
   }
 
@@ -78,7 +114,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTaskList(List<TaskModel> tasks, WidgetRef ref) {
+  Widget _buildTaskList(List<TaskEntity> tasks, WidgetRef ref) {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
       itemCount: tasks.length,
@@ -101,10 +137,13 @@ class HomeScreen extends ConsumerWidget {
           },
           child: TaskCard(
             task: task,
-            onDelete: (idx) =>
-                ref.read(taskControllerProvider.notifier).deleteById(task.id),
-            onEditStatus: (idx, updatedTask) =>
-                ref.read(taskControllerProvider.notifier).addTask(updatedTask),
+            onDelete: (id) => _deleteTask(context, ref, id),
+            onEditStatus: (_, updatedTask) async {
+              debugPrint(
+                'Reset task: ${updatedTask.id} - remaining: ${updatedTask.remainingDurationMs}',
+              );
+              await _saveTask(context, ref, updatedTask);
+            },
             onEditPressed: () => _navigateToAddTask(context, ref, task: task),
             onTap: () {
               // Navigasi ke timer tetap pakai Navigator

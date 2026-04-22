@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../providers/theme_provider.dart';
+import '../providers/theme_providers.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -94,7 +94,7 @@ class SettingsScreen extends ConsumerWidget {
                     Switch(
                       value: isDark,
                       onChanged: (_) => _toggleTheme(ref, isDark),
-                      activeColor: colorScheme.primary,
+                      activeThumbColor: colorScheme.primary,
                       activeTrackColor: colorScheme.primaryContainer,
                     ),
                   ],

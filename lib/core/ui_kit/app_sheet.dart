@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'app_button.dart';
 
@@ -8,7 +10,7 @@ class AppSheet {
     required String description,
     required IconData icon,
     required String confirmLabel,
-    required VoidCallback onConfirm,
+    required FutureOr<void> Function() onConfirm,
     Color? confirmColor,
   }) {
     return showModalBottomSheet(
@@ -70,8 +72,9 @@ class AppSheet {
               label: confirmLabel,
               icon: Icons.check_rounded,
               backgroundColor: confirmColor,
-              onPressed: () {
-                onConfirm();
+              onPressed: () async {
+                await onConfirm();
+                if (!context.mounted) return;
                 Navigator.pop(context);
               },
             ),

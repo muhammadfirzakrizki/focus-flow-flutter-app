@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../features/settings/data/datasources/theme_local_datasource.dart';
+import '../../data/datasources/theme_local_datasource.dart';
 
 final themeDataSourceProvider = Provider<ThemeLocalDataSource>((ref) {
   return ThemeLocalDataSource();

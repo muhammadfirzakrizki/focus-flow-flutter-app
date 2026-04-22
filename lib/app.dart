@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'features/task/presentation/pages/home_screen.dart';
-import 'providers/theme_provider.dart';
+import 'features/settings/presentation/providers/theme_providers.dart';
 
 class FocusFlowApp extends ConsumerWidget {
   const FocusFlowApp({super.key});

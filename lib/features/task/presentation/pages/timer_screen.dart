@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Tambahkan Riverpod
-import '../../data/models/task_model.dart';
-import '../../../../providers/task/task_provider.dart'; // Import provider kamu
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../domain/entities/task_entity.dart';
+import '../providers/task_providers.dart';
 import '../widgets/timer_display.dart';
 import 'package:focus_flow/core/ui_kit/app_button.dart';
 import 'package:focus_flow/core/ui_kit/app_sheet.dart';
 
 class TimerScreen extends ConsumerStatefulWidget {
-  final TaskModel task;
+  final TaskEntity task;
   const TimerScreen({super.key, required this.task});
 
   @override
@@ -16,14 +16,18 @@ class TimerScreen extends ConsumerStatefulWidget {
 }
 
 class _TimerScreenState extends ConsumerState<TimerScreen> {
-  late int _secondsRemaining;
+  late final int _initialDurationMs;
+  late int _remainingDurationMs;
   Timer? _timer;
   bool _isRunning = false;
 
   @override
   void initState() {
     super.initState();
-    _secondsRemaining = widget.task.duration;
+    _initialDurationMs = widget.task.duration * 1000;
+    _remainingDurationMs = widget.task.remainingDurationMs <= 0
+        ? _initialDurationMs
+        : widget.task.remainingDurationMs;
   }
 
   Future<void> _toggleTimer() async {
@@ -33,10 +37,24 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       await _saveProgress();
       return;
     } else {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (_secondsRemaining > 0) {
-          setState(() => _secondsRemaining--);
+      if (_remainingDurationMs <= 0) {
+        await _finishTask();
+        return;
+      }
+
+      _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+        if (_remainingDurationMs > 0) {
+          setState(() {
+            _remainingDurationMs = _remainingDurationMs > 100
+                ? _remainingDurationMs - 100
+                : 0;
+          });
+          if (_remainingDurationMs == 0) {
+            timer.cancel();
+            _finishTask();
+          }
         } else {
+          timer.cancel();
           _finishTask();
         }
       });
@@ -46,15 +64,14 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
 
   Future<void> _saveProgress() async {
     final updatedTask = widget.task.copyWith(
-      duration: _secondsRemaining,
+      remainingDurationMs: _remainingDurationMs,
       isDone: false,
     );
 
-    await ref.read(taskControllerProvider.notifier).addTask(updatedTask);
-    if (!mounted) return;
-
-    final saveState = ref.read(taskControllerProvider);
-    if (saveState.hasError) {
+    try {
+      await ref.read(taskControllerProvider).saveTask(updatedTask);
+    } catch (_) {
+      if (!mounted) return;
       await AppSheet.showConfirmation(
         context: context,
         title: "Penyimpanan Gagal",
@@ -71,14 +88,15 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     _timer?.cancel();
     setState(() => _isRunning = false);
 
-    final completedTask = widget.task.copyWith(isDone: true, duration: 0);
+    final completedTask = widget.task.copyWith(
+      isDone: true,
+      remainingDurationMs: 0,
+    );
 
-    // Tunggu proses simpan agar tidak balapan dengan init DB.
-    await ref.read(taskControllerProvider.notifier).addTask(completedTask);
-    if (!mounted) return;
-
-    final finishState = ref.read(taskControllerProvider);
-    if (finishState.hasError) {
+    try {
+      await ref.read(taskControllerProvider).completeTask(completedTask);
+    } catch (_) {
+      if (!mounted) return;
       await AppSheet.showConfirmation(
         context: context,
         title: "Koneksi Database Gagal",
@@ -94,14 +112,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     _showFinishedDialog(completedTask);
   }
 
-  String _formatTime(int totalSeconds) {
-    final int hours = totalSeconds ~/ 3600;
-    final int minutes = (totalSeconds % 3600) ~/ 60;
-    final int seconds = totalSeconds % 60;
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  void _showFinishedDialog(TaskModel completedTask) {
+  void _showFinishedDialog(TaskEntity completedTask) {
     AppSheet.showConfirmation(
       context: context,
       title: "Luar Biasa!",
@@ -135,8 +146,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
             _buildHeader(colorScheme),
             const Spacer(),
             TimerDisplay(
-              progress: _secondsRemaining / widget.task.duration,
-              formattedTime: _formatTime(_secondsRemaining),
+              progress: _initialDurationMs == 0
+                  ? 0
+                  : _remainingDurationMs / _initialDurationMs,
+              formattedTime: _formatTime(_remainingDurationMs),
               isRunning: _isRunning,
             ),
             const Spacer(),
@@ -179,11 +192,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
             onPressed: _toggleTimer,
           ),
         ),
-        if (!_isRunning && _secondsRemaining < widget.task.duration) ...[
+        if (!_isRunning && _remainingDurationMs < _initialDurationMs) ...[
           const SizedBox(width: 12),
           IconButton.filledTonal(
-            onPressed: () =>
-                setState(() => _secondsRemaining = widget.task.duration),
+            onPressed: _confirmReset,
             icon: const Icon(Icons.refresh_rounded),
             padding: const EdgeInsets.all(16),
           ),
@@ -203,6 +215,39 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _resetTimer() async {
+    _timer?.cancel();
+
+    setState(() {
+      _remainingDurationMs = _initialDurationMs;
+      _isRunning = false;
+    });
+
+    // Sekarang baru aman untuk save
+    await _saveProgress();
+  }
+
+  void _confirmReset() {
+    AppSheet.showConfirmation(
+      context: context,
+      title: "Reset Timer?",
+      description:
+          "Timer akan kembali ke durasi awal dan progres berjalan saat ini akan hilang.",
+      icon: Icons.refresh_rounded,
+      confirmLabel: "YA, RESET",
+      confirmColor: Theme.of(context).colorScheme.secondary,
+      onConfirm: _resetTimer,
+    );
+  }
+
+  String _formatTime(int ms) {
+    final d = Duration(milliseconds: ms);
+    final hms = d.toString().split('.').first.padLeft(8, '0');
+    final msStr = (ms % 1000 ~/ 10).toString().padLeft(2, '0');
+
+    return '$hms.$msStr';
   }
 
   @override
